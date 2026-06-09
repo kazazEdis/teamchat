@@ -8,6 +8,8 @@ import type { ConversationRow, MessageRow, RosterUser } from "./types";
 
 const IconChat = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>);
 const IconX = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>);
+const IconClip = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>);
+const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "👀"];
 
 const fmtTime = (ms: number) => {
   const d = new Date(ms); const p = (n: number) => String(n).padStart(2, "0");
@@ -171,7 +173,6 @@ function ChatThread({ conversationId }: { conversationId: string }) {
   const msgs = useQuery(api.messages as any, { conversationId }) as MessageRow[] | undefined;
   const roster = useQuery(api.roster as any, {}) as RosterUser[] | undefined;
   const convos = useQuery(api.listMine as any, {}) as ConversationRow[] | undefined;
-  const sendMessage = useMutation(api.sendMessage as any);
   const markRead = useMutation(api.markRead as any);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -191,22 +192,113 @@ function ChatThread({ conversationId }: { conversationId: string }) {
       <div className="tc-msgs" ref={scrollRef}>
         {msgs === undefined ? <div className="tc-empty">…</div>
           : msgs.length === 0 ? <div className="tc-empty">No messages yet — say hi 👋</div>
-          : msgs.map((m) => <MessageBubble key={m._id} m={m} mine={m.senderId === me.userId} senderName={nameById[m.senderId] || "User"} names={names} />)}
+          : msgs.map((m) => <MessageBubble key={m._id} conversationId={conversationId} m={m} mine={m.senderId === me.userId} senderName={nameById[m.senderId] || "User"} names={names} />)}
       </div>
+      <Composer conversationId={conversationId} users={users} />
+    </div>
+  );
+}
+
+function Composer({ conversationId, users }: { conversationId: string; users: { userId: string; name: string }[] }) {
+  const { api } = useChatCtx();
+  const sendMessage = useMutation(api.sendMessage as any);
+  const uploadUrl = useMutation((api.uploadUrl ?? api.sendMessage) as any);
+  const [pending, setPending] = useState<{ storageId: string; name: string; contentType?: string; size?: number }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const onFiles = async (files: FileList | null) => {
+    if (!files || !api.uploadUrl) return;
+    setBusy(true);
+    try {
+      for (const f of Array.from(files)) {
+        const url = await uploadUrl({});
+        const res = await fetch(url as string, { method: "POST", headers: { "Content-Type": f.type || "application/octet-stream" }, body: f });
+        const { storageId } = await res.json();
+        setPending((p) => [...p, { storageId, name: f.name, contentType: f.type, size: f.size }]);
+      }
+    } catch { /* ignore */ } finally { setBusy(false); }
+  };
+  const submit = (text: string, mentions: string[]) => {
+    const atts = pending;
+    sendMessage({ conversationId, text, mentions, attachments: atts.length ? atts : undefined }).catch(() => {});
+    setPending([]);
+  };
+  return (
+    <div>
+      {pending.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "6px 8px 0" }}>
+          {pending.map((a, i) => <span key={i} className="tc-pill">📎 {a.name} <span className="tc-x" style={{ padding: 0 }} onClick={() => setPending((p) => p.filter((_, j) => j !== i))}>×</span></span>)}
+        </div>
+      )}
       <div className="tc-composer">
-        <MentionInput users={users} placeholder="Message…" onSubmit={(text, mentions) => { sendMessage({ conversationId, text, mentions }).catch(() => {}); }} />
+        {api.uploadUrl && (
+          <>
+            <button className="tc-iconbtn" disabled={busy} title="Attach" onClick={() => fileRef.current?.click()}><IconClip /></button>
+            <input ref={fileRef} type="file" multiple style={{ display: "none" }} onChange={(e) => { onFiles(e.target.files); e.target.value = ""; }} />
+          </>
+        )}
+        <MentionInput users={users} placeholder="Message…" allowEmpty={pending.length > 0} onSubmit={submit} />
       </div>
     </div>
   );
 }
 
-function MessageBubble({ m, mine, senderName, names }: { m: MessageRow; mine: boolean; senderName: string; names: string[] }) {
+function AttachmentChip({ conversationId, a }: { conversationId: string; a: { storageId: string; name: string } }) {
+  const { api } = useChatCtx();
+  const url = useQuery((api.attachmentUrl ?? api.roster) as any, api.attachmentUrl ? { conversationId, storageId: a.storageId } : "skip") as string | null | undefined;
+  return (
+    <a href={url || undefined} target="_blank" rel="noreferrer" className="tc-pill" style={{ textDecoration: "none" }} onClick={(e) => { if (!url) e.preventDefault(); }}>📎 {a.name}</a>
+  );
+}
+
+function MessageBubble({ conversationId, m, mine, senderName, names }: { conversationId: string; m: MessageRow; mine: boolean; senderName: string; names: string[] }) {
+  const { api, me } = useChatCtx();
+  const toggleReaction = useMutation((api.toggleReaction ?? api.sendMessage) as any);
+  const editMessage = useMutation((api.editMessage ?? api.sendMessage) as any);
+  const deleteMessage = useMutation((api.deleteMessage ?? api.sendMessage) as any);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(m.text);
+  const [picker, setPicker] = useState(false);
+
+  const react = (emoji: string) => { if (api.toggleReaction) toggleReaction({ messageId: m._id, emoji }).catch(() => {}); setPicker(false); };
+  const saveEdit = () => { if (api.editMessage && draft.trim()) editMessage({ messageId: m._id, text: draft.trim() }).catch(() => {}); setEditing(false); };
+
   return (
     <div className="tc-bubble">
       <Avatar name={senderName} size={28} />
       <div className="tc-b">
-        <div className="tc-bh"><span className="tc-bn">{mine ? "You" : senderName}</span> · {fmtTime(m.createdAt)}{m.editedAt ? " · (edited)" : ""}</div>
-        {m.deleted ? <div className="tc-bt tc-deleted">message deleted</div> : <div className="tc-bt">{renderMentions(m.text, names)}</div>}
+        <div className="tc-bh">
+          <span className="tc-bn">{mine ? "You" : senderName}</span> · {fmtTime(m.createdAt)}{m.editedAt ? " · (edited)" : ""}
+          {!m.deleted && (
+            <span style={{ float: "right", display: "inline-flex", gap: 6 }}>
+              {api.toggleReaction && <button className="tc-x" title="React" onClick={() => setPicker((p) => !p)}>＋</button>}
+              {mine && api.editMessage && <button className="tc-x" title="Edit" onClick={() => { setDraft(m.text); setEditing(true); }}>✎</button>}
+              {mine && api.deleteMessage && <button className="tc-x" title="Delete" onClick={() => deleteMessage({ messageId: m._id }).catch(() => {})}>🗑</button>}
+            </span>
+          )}
+        </div>
+        {picker && (
+          <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>{EMOJIS.map((e) => <button key={e} className="tc-x" style={{ fontSize: 16 }} onClick={() => react(e)}>{e}</button>)}</div>
+        )}
+        {m.deleted ? <div className="tc-bt tc-deleted">message deleted</div>
+          : editing ? (
+            <div style={{ display: "flex", gap: 6 }}>
+              <input className="tc-input" style={{ minHeight: 0, padding: "4px 8px" }} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditing(false); }} autoFocus />
+              <button className="tc-send" style={{ height: 30 }} onClick={saveEdit}>Save</button>
+            </div>
+          ) : (
+            <>
+              {m.text && <div className="tc-bt">{renderMentions(m.text, names)}</div>}
+              {m.attachments.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>{m.attachments.map((a, i) => <AttachmentChip key={i} conversationId={conversationId} a={a} />)}</div>}
+              {m.reactions.length > 0 && (
+                <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
+                  {m.reactions.map((r) => (
+                    <button key={r.emoji} className="tc-pill" style={{ cursor: "pointer", borderColor: r.userIds.includes(me.userId) ? "var(--primary)" : "transparent" }} onClick={() => react(r.emoji)}>{r.emoji} {r.userIds.length}</button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
       </div>
     </div>
   );

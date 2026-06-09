@@ -4,10 +4,11 @@ const PILL_CLASS = "tc-pill";
 
 // A contentEditable message composer: @-mentions render as inline non-editable pills as you type.
 // Enter sends; Shift+Enter inserts a newline. Serializes to "@Name" text + the mentioned userIds.
-export function MentionInput({ users, placeholder, onSubmit }: {
+export function MentionInput({ users, placeholder, onSubmit, allowEmpty }: {
   users: { userId: string; name: string }[];
   placeholder?: string;
   onSubmit: (text: string, mentionIds: string[]) => void;
+  allowEmpty?: boolean;   // permit a send with no text (e.g. attachment-only)
 }) {
   const edRef = useRef<HTMLDivElement | null>(null);
   const [mq, setMq] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export function MentionInput({ users, placeholder, onSubmit }: {
 
   const send = () => {
     const { text, ids } = serialize();
-    if (!text) return;
+    if (!text && !allowEmpty) return;
     onSubmit(text, ids);
     if (edRef.current) edRef.current.innerHTML = "";
     setEmpty(true); setMq(null);

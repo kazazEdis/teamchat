@@ -17,6 +17,12 @@ export interface ChatApi {
   createChannel?: FunctionReference<"mutation">;
   joinChannel?: FunctionReference<"mutation">;
   leaveChannel?: FunctionReference<"mutation">;
+  // Phase 3 (optional):
+  editMessage?: FunctionReference<"mutation">;
+  deleteMessage?: FunctionReference<"mutation">;
+  toggleReaction?: FunctionReference<"mutation">;
+  uploadUrl?: FunctionReference<"mutation">;
+  attachmentUrl?: FunctionReference<"query">;
 }
 
 export interface ChatMe { userId: string; name?: string }
@@ -37,7 +43,7 @@ export interface MessageRow {
   senderId: string;
   text: string;
   mentions: string[];
-  attachments: { blobId: string; name: string; contentType?: string; size?: number }[];
+  attachments: { storageId: string; name: string; contentType?: string; size?: number }[];
   reactions: { emoji: string; userIds: string[] }[];
   createdAt: number;
   editedAt: number | null;
