@@ -1,0 +1,28 @@
+{
+  "name": "teamchat",
+  "version": "0.1.0",
+  "description": "Teams-style in-app chat + presence UI (React). Backend-agnostic: the host app passes its Convex function references in. Ships TS source (no build) — consumers use transpilePackages.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Edis Kazaz",
+  "repository": { "type": "git", "url": "git+https://github.com/kazazEdis/teamchat.git" },
+  "keywords": ["chat", "presence", "convex", "react", "messaging"],
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react.tsx"
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "convex": ">=1.17.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "convex": "^1.17.0",
+    "react": "^18",
+    "typescript": "^5.9.3"
+  }
+}
