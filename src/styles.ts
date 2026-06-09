@@ -6,10 +6,10 @@ export const TEAMCHAT_CSS = `
 .tc-fab svg{width:24px;height:24px}
 .tc-badge{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;padding:0 5px;border-radius:9999px;background:var(--destructive,#dc2626);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid var(--card,var(--background))}
 @media(max-width:680px){.tc-fab{bottom:16px;right:16px;width:52px;height:52px}}
-.tc-overlay{position:fixed;inset:0;z-index:200;display:flex;justify-content:flex-end}
-.tc-overlay-bg{position:absolute;inset:0;background:rgba(0,0,0,.30)}
-.tc-panel{position:relative;height:100%;width:min(720px,96vw);display:flex;background:var(--card,var(--background));color:var(--foreground);border-left:1px solid var(--border);box-shadow:0 0 40px rgba(0,0,0,.25)}
-.tc-sidebar{width:240px;min-width:240px;border-right:1px solid var(--border);display:flex;flex-direction:column}
+.tc-overlay{position:fixed;inset:0;z-index:200}
+.tc-overlay-bg{position:absolute;inset:0;background:transparent}
+.tc-panel{position:fixed;right:24px;bottom:92px;width:384px;max-width:calc(100vw - 32px);height:min(640px,calc(100vh - 116px));display:flex;flex-direction:column;overflow:hidden;background:var(--card,var(--background));color:var(--foreground);border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.28)}
+.tc-home{flex:1;min-height:0;display:flex;flex-direction:column}
 .tc-tabs{display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--border)}
 .tc-tab{flex:1;padding:5px 6px;border:none;border-radius:6px;background:transparent;color:var(--muted-foreground);font-size:12px;font-weight:500;cursor:pointer}
 .tc-tab.active{background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary)}
@@ -25,9 +25,10 @@ export const TEAMCHAT_CSS = `
 .tc-unreaddot{width:8px;height:8px;border-radius:9999px;background:var(--primary);flex:0 0 auto}
 .tc-av{position:relative;display:inline-grid;place-items:center;border-radius:9999px;color:#fff;font-weight:600;user-select:none;flex:0 0 auto}
 .tc-av-status{position:absolute;bottom:-1px;right:-1px;width:9px;height:9px;border-radius:9999px;border:2px solid var(--card,var(--background))}
-.tc-thread{flex:1;display:flex;flex-direction:column;min-width:0}
+.tc-thread{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
 .tc-thead{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border)}
 .tc-thead .tc-h{font-weight:600;font-size:14px}
+.tc-thead-sub{font-size:11px;color:var(--muted-foreground);line-height:1.1}
 .tc-msgs{flex:1;overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 .tc-bubble{display:flex;gap:8px;align-items:flex-start}
 .tc-bubble .tc-b{min-width:0;flex:1}
@@ -48,6 +49,7 @@ export const TEAMCHAT_CSS = `
 .tc-empty{padding:24px;text-align:center;color:var(--muted-foreground);font-size:13px}
 .tc-x{background:transparent;border:none;color:var(--muted-foreground);cursor:pointer;padding:2px}
 .tc-newbtn{margin:8px;padding:6px;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--primary);cursor:pointer;font-size:12px;font-weight:600}
+.tc-newbtn-primary{border:none;background:var(--primary);color:#fff}
 .tc-support-entry{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border:none;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--primary) 7%,transparent);color:var(--foreground);cursor:pointer}
 .tc-support-entry:hover{background:color-mix(in srgb,var(--primary) 12%,transparent)}
 .tc-support-entry.active{background:color-mix(in srgb,var(--primary) 16%,transparent)}
@@ -55,7 +57,7 @@ export const TEAMCHAT_CSS = `
 .tc-support-entry .tc-title{font-size:13px;font-weight:700}
 .tc-support-entry .tc-prev{font-size:11px;color:var(--muted-foreground)}
 .tc-support-ic{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:9999px;background:var(--primary);color:#fff;flex:0 0 auto}
-@media(max-width:680px){.tc-panel{width:100vw}.tc-sidebar{width:200px;min-width:200px}}
+@media(max-width:680px){.tc-panel{right:0;bottom:0;width:100vw;max-width:100vw;height:100dvh;border-radius:0;border:none}}
 `;
 
 let injected = false;

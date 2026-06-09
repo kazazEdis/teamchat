@@ -9,6 +9,7 @@ import type { ConversationRow, MessageRow, RosterUser, SupportMessageRow } from 
 const IconChat = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>);
 const IconLife = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /><path d="m4.93 4.93 4.24 4.24m5.66 5.66 4.24 4.24M14.83 9.17l4.24-4.24M9.17 14.83l-4.24 4.24" /></svg>);
 const IconX = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>);
+const IconBack = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>);
 const IconClip = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>);
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "👀"];
 
@@ -29,7 +30,8 @@ export function ChatLauncher() {
   );
 }
 
-// The slide-in panel: sidebar (conversations + people) on the left, active thread on the right.
+// Compact Messenger-style popup anchored above the launcher FAB (bottom-right). Single column: the
+// "home" pane (conversations / channels / people) OR a single conversation thread with a back arrow.
 export function ChatPanel() {
   const { open, setOpen, active } = useChatCtx();
   if (!open) return null;
@@ -37,36 +39,35 @@ export function ChatPanel() {
     <div className="tc-overlay">
       <div className="tc-overlay-bg" onClick={() => setOpen(false)} />
       <div className="tc-panel" onClick={(e) => e.stopPropagation()}>
-        <ChatSidebar />
-        {active === SUPPORT_ID ? <SupportThread /> : active ? <ChatThread conversationId={active} /> : (
-          <div className="tc-thread">
-            <div className="tc-thead"><span className="tc-h">Chat</span><button className="tc-x" style={{ marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button></div>
-            <div className="tc-empty">Select a conversation or a colleague to start.</div>
-          </div>
-        )}
+        {active === SUPPORT_ID ? <SupportThread /> : active ? <ChatThread conversationId={active} /> : <ChatHome />}
       </div>
     </div>
   );
 }
 
-function ChatSidebar() {
+function ChatHome() {
+  const { setOpen } = useChatCtx();
   const [tab, setTab] = useState<"chats" | "channels" | "people">("chats");
   return (
-    <div className="tc-sidebar">
+    <div className="tc-home">
+      <div className="tc-thead">
+        <span className="tc-h">Messages</span>
+        <button className="tc-x" style={{ marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button>
+      </div>
       <SupportEntry />
       <div className="tc-tabs">
         <button className={`tc-tab${tab === "chats" ? " active" : ""}`} onClick={() => setTab("chats")}>Chats</button>
         <button className={`tc-tab${tab === "channels" ? " active" : ""}`} onClick={() => setTab("channels")}>Channels</button>
         <button className={`tc-tab${tab === "people" ? " active" : ""}`} onClick={() => setTab("people")}>People</button>
       </div>
-      <NewConversationMenu />
+      <NewConversationMenu onNewChat={() => setTab("people")} />
       {tab === "chats" ? <ConversationList /> : tab === "channels" ? <ChannelList /> : <PeopleRoster />}
     </div>
   );
 }
 
-// Create a new group or channel (compact inline forms).
-function NewConversationMenu() {
+// New conversation actions: New chat (DM → People picker), + Group, + Channel (compact inline forms).
+function NewConversationMenu({ onNewChat }: { onNewChat?: () => void }) {
   const { api, me, openConversation } = useChatCtx();
   const [mode, setMode] = useState<null | "group" | "channel">(null);
   const [title, setTitle] = useState("");
@@ -75,12 +76,12 @@ function NewConversationMenu() {
   const createGroup = useMutation((api.createGroup ?? api.getOrCreateDm) as any);
   const createChannel = useMutation((api.createChannel ?? api.getOrCreateDm) as any);
   const reset = () => { setMode(null); setTitle(""); setPicked([]); };
-  if (!api.createGroup && !api.createChannel) return null;
   if (!mode) {
     return (
       <div style={{ display: "flex", gap: 6, margin: "8px 8px 0" }}>
-        {api.createGroup && <button className="tc-newbtn" style={{ margin: 0, flex: 1 }} onClick={() => setMode("group")}>+ Group</button>}
-        {api.createChannel && <button className="tc-newbtn" style={{ margin: 0, flex: 1 }} onClick={() => setMode("channel")}>+ Channel</button>}
+        <button className="tc-newbtn tc-newbtn-primary" style={{ margin: 0, flex: 1 }} onClick={() => onNewChat?.()}>＋ New chat</button>
+        {api.createGroup && <button className="tc-newbtn" style={{ margin: 0, flex: 1 }} onClick={() => setMode("group")}>Group</button>}
+        {api.createChannel && <button className="tc-newbtn" style={{ margin: 0, flex: 1 }} onClick={() => setMode("channel")}>Channel</button>}
       </div>
     );
   }
@@ -133,20 +134,28 @@ function ChannelList() {
 function ConversationList() {
   const { api, active, setActive } = useChatCtx();
   const rows = useQuery(api.listMine as any, {}) as ConversationRow[] | undefined;
+  const roster = useQuery(api.roster as any, {}) as RosterUser[] | undefined;
+  const onlineById = useMemo(() => Object.fromEntries((roster ?? []).map((r) => [r.userId, r.online])), [roster]);
   if (rows === undefined) return <div className="tc-empty">…</div>;
-  if (rows.length === 0) return <div className="tc-empty">No conversations yet. Open People to start a chat.</div>;
+  if (rows.length === 0) return <div className="tc-empty">No conversations yet. Tap “New chat” to start.</div>;
   return (
     <div className="tc-list">
-      {rows.map((c) => (
-        <div key={c._id} className={`tc-row${c.unread ? " unread" : ""}${active === c._id ? " active" : ""}`} onClick={() => setActive(c._id)}>
-          <Avatar name={c.title || "?"} size={30} />
-          <div className="tc-meta">
-            <div className="tc-title">{c.title || "Conversation"}</div>
-            <div className="tc-prev">{c.lastPreview}</div>
+      {rows.map((c) => {
+        // Presence shown on DMs (the peer's status); groups/channels have no single status.
+        const online = c.kind === "dm" && c.peerId ? !!onlineById[c.peerId] : undefined;
+        return (
+          <div key={c._id} className={`tc-row${c.unread ? " unread" : ""}${active === c._id ? " active" : ""}`} onClick={() => setActive(c._id)}>
+            {c.kind === "channel"
+              ? <span style={{ fontWeight: 700, color: "var(--muted-foreground)", width: 30, textAlign: "center" }}>#</span>
+              : <Avatar name={c.title || "?"} size={30} online={online} />}
+            <div className="tc-meta">
+              <div className="tc-title">{c.title || "Conversation"}</div>
+              <div className="tc-prev">{c.lastPreview}</div>
+            </div>
+            {c.unread && <span className="tc-unreaddot" />}
           </div>
-          {c.unread && <span className="tc-unreaddot" />}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -185,7 +194,7 @@ function SupportEntry() {
 }
 
 function SupportThread() {
-  const { api, setOpen } = useChatCtx();
+  const { api, setOpen, setActive } = useChatCtx();
   const msgs = useQuery((api.support?.thread ?? api.unreadCount) as any, api.support ? {} : "skip") as SupportMessageRow[] | undefined;
   const send = useMutation((api.support?.send ?? api.sendMessage) as any);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -194,7 +203,12 @@ function SupportThread() {
   const submit = () => { const t = text.trim(); if (!t) return; send({ text: t }).catch(() => {}); setText(""); };
   return (
     <div className="tc-thread">
-      <div className="tc-thead"><span className="tc-h">Support</span><button className="tc-x" style={{ marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button></div>
+      <div className="tc-thead">
+        <button className="tc-x" onClick={() => setActive(null)}><IconBack /></button>
+        <span className="tc-support-ic" style={{ width: 26, height: 26 }}><IconLife /></span>
+        <span className="tc-h">Support</span>
+        <button className="tc-x" style={{ marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button>
+      </div>
       <div className="tc-msgs" ref={scrollRef}>
         {msgs === undefined ? <div className="tc-empty">…</div>
           : msgs.length === 0 ? <div className="tc-empty">Send a message to the app team — we'll reply here.</div>
@@ -217,7 +231,7 @@ function SupportThread() {
 }
 
 function ChatThread({ conversationId }: { conversationId: string }) {
-  const { api, me, setOpen } = useChatCtx();
+  const { api, me, setOpen, setActive } = useChatCtx();
   const msgs = useQuery(api.messages as any, { conversationId }) as MessageRow[] | undefined;
   const roster = useQuery(api.roster as any, {}) as RosterUser[] | undefined;
   const convos = useQuery(api.listMine as any, {}) as ConversationRow[] | undefined;
@@ -225,6 +239,7 @@ function ChatThread({ conversationId }: { conversationId: string }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const nameById = useMemo(() => Object.fromEntries((roster ?? []).map((r) => [r.userId, r.name])), [roster]);
+  const onlineById = useMemo(() => Object.fromEntries((roster ?? []).map((r) => [r.userId, r.online])), [roster]);
   const names = useMemo(() => (roster ?? []).map((r) => r.name), [roster]);
   const users = useMemo(() => (roster ?? []).map((r) => ({ userId: r.userId, name: r.name })), [roster]);
 
@@ -232,11 +247,27 @@ function ChatThread({ conversationId }: { conversationId: string }) {
   useEffect(() => { markRead({ conversationId }).catch(() => {}); }, [conversationId, msgs?.length]); // eslint-disable-line
   useEffect(() => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs?.length]);
 
-  const title = useMemo(() => convos?.find((c) => c._id === conversationId)?.title || "Conversation", [convos, conversationId]);
+  const convo = useMemo(() => convos?.find((c) => c._id === conversationId), [convos, conversationId]);
+  const title = convo?.title || "Conversation";
+  // DM subtitle = peer presence; channel/group = kind label.
+  const subtitle = convo?.kind === "dm" && convo.peerId
+    ? (onlineById[convo.peerId] ? "Online" : "Offline")
+    : convo?.kind === "channel" ? "Channel" : convo?.kind === "group" ? "Group" : "";
+  const peerOnline = convo?.kind === "dm" && convo.peerId ? !!onlineById[convo.peerId] : undefined;
 
   return (
     <div className="tc-thread">
-      <div className="tc-thead"><span className="tc-h">{title}</span><button className="tc-x" style={{ marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button></div>
+      <div className="tc-thead">
+        <button className="tc-x" onClick={() => setActive(null)}><IconBack /></button>
+        {convo?.kind === "channel"
+          ? <span style={{ fontWeight: 700, color: "var(--muted-foreground)" }}>#</span>
+          : <Avatar name={title} size={26} online={peerOnline} />}
+        <div style={{ minWidth: 0 }}>
+          <div className="tc-h" style={{ lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
+          {subtitle && <div className="tc-thead-sub">{subtitle}</div>}
+        </div>
+        <button className="tc-x" style={{ marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button>
+      </div>
       <div className="tc-msgs" ref={scrollRef}>
         {msgs === undefined ? <div className="tc-empty">…</div>
           : msgs.length === 0 ? <div className="tc-empty">No messages yet — say hi 👋</div>
