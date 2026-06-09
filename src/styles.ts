@@ -1,9 +1,11 @@
 // Self-contained stylesheet (injected once). Uses the HOST app's theme CSS variables (--primary,
 // --background, --border, …) so the chat UI matches the app + dark mode without any Tailwind dep.
 export const TEAMCHAT_CSS = `
-.tc-fab{position:relative;display:inline-grid;place-items:center;width:30px;height:30px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--muted-foreground);cursor:pointer;transition:color .12s}
-.tc-fab:hover{color:var(--foreground)}
-.tc-badge{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:9999px;background:var(--destructive,#dc2626);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
+.tc-fab{position:fixed;bottom:24px;right:24px;z-index:190;display:inline-grid;place-items:center;width:56px;height:56px;border:none;border-radius:9999px;background:var(--primary);color:#fff;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:transform .12s,box-shadow .12s}
+.tc-fab:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.32)}
+.tc-fab svg{width:24px;height:24px}
+.tc-badge{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;padding:0 5px;border-radius:9999px;background:var(--destructive,#dc2626);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid var(--card,var(--background))}
+@media(max-width:680px){.tc-fab{bottom:16px;right:16px;width:52px;height:52px}}
 .tc-overlay{position:fixed;inset:0;z-index:200;display:flex;justify-content:flex-end}
 .tc-overlay-bg{position:absolute;inset:0;background:rgba(0,0,0,.30)}
 .tc-panel{position:relative;height:100%;width:min(720px,96vw);display:flex;background:var(--card,var(--background));color:var(--foreground);border-left:1px solid var(--border);box-shadow:0 0 40px rgba(0,0,0,.25)}

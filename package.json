@@ -1,6 +1,6 @@
 {
   "name": "teamchat",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Teams-style in-app chat + presence UI (React). Backend-agnostic: the host app passes its Convex function references in. Ships TS source (no build) — consumers use transpilePackages.",
   "type": "module",
   "license": "MIT",
