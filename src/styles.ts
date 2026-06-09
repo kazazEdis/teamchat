@@ -1,20 +1,22 @@
 // Self-contained stylesheet (injected once). Uses the HOST app's theme CSS variables (--primary,
 // --background, --border, …) so the chat UI matches the app + dark mode without any Tailwind dep.
 export const TEAMCHAT_CSS = `
-.tc-fab{position:fixed;bottom:24px;right:24px;z-index:190;display:inline-grid;place-items:center;width:56px;height:56px;border:none;border-radius:9999px;background:var(--primary);color:#fff;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:transform .12s,box-shadow .12s}
+.tc-fab{position:fixed;bottom:24px;right:24px;z-index:190;display:inline-grid;place-items:center;width:56px;height:56px;border:none;border-radius:9999px;background:var(--primary);color:#fff;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.25);transition:transform .12s,box-shadow .12s;animation:tcFabIn .25s ease}
 .tc-fab:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.32)}
-.tc-fab svg{width:24px;height:24px}
+.tc-fab:active{transform:scale(.92)}
+.tc-fab svg{width:24px;height:24px;transition:transform .2s ease}
+.tc-fab:hover svg{transform:rotate(-8deg)}
 .tc-badge{position:absolute;top:-2px;right:-2px;min-width:18px;height:18px;padding:0 5px;border-radius:9999px;background:var(--destructive,#dc2626);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;border:2px solid var(--card,var(--background))}
 @media(max-width:680px){.tc-fab{bottom:16px;right:16px;width:52px;height:52px}}
 .tc-overlay{position:fixed;inset:0;z-index:200}
 .tc-overlay-bg{position:absolute;inset:0;background:transparent}
-.tc-panel{position:fixed;right:24px;bottom:92px;width:384px;max-width:calc(100vw - 32px);height:min(640px,calc(100vh - 116px));display:flex;flex-direction:column;overflow:hidden;background:var(--card,var(--background));color:var(--foreground);border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.28)}
+.tc-panel{position:fixed;right:24px;bottom:92px;width:384px;max-width:calc(100vw - 32px);height:min(640px,calc(100vh - 116px));display:flex;flex-direction:column;overflow:hidden;background:var(--card,var(--background));color:var(--foreground);border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.28);transform-origin:bottom right;animation:tcPop .22s cubic-bezier(.16,1,.3,1)}
 .tc-home{flex:1;min-height:0;display:flex;flex-direction:column}
 .tc-tabs{display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--border)}
 .tc-tab{flex:1;padding:5px 6px;border:none;border-radius:6px;background:transparent;color:var(--muted-foreground);font-size:12px;font-weight:500;cursor:pointer}
 .tc-tab.active{background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary)}
 .tc-list{flex:1;overflow:auto}
-.tc-row{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border)}
+.tc-row{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s ease}
 .tc-row:hover{background:color-mix(in srgb,var(--foreground) 5%,transparent)}
 .tc-row.active{background:color-mix(in srgb,var(--primary) 8%,transparent)}
 .tc-row .tc-meta{min-width:0;flex:1}
@@ -30,7 +32,7 @@ export const TEAMCHAT_CSS = `
 .tc-thead .tc-h{font-weight:600;font-size:14px}
 .tc-thead-sub{font-size:11px;color:var(--muted-foreground);line-height:1.1}
 .tc-msgs{flex:1;overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
-.tc-bubble{display:flex;gap:8px;align-items:flex-start}
+.tc-bubble{display:flex;gap:8px;align-items:flex-start;animation:tcRise .24s ease both}
 .tc-bubble .tc-b{min-width:0;flex:1}
 .tc-bubble .tc-bh{font-size:11px;color:var(--muted-foreground);margin-bottom:2px}
 .tc-bubble .tc-bn{font-weight:600;color:var(--foreground)}
@@ -57,7 +59,19 @@ export const TEAMCHAT_CSS = `
 .tc-support-entry .tc-title{font-size:13px;font-weight:700}
 .tc-support-entry .tc-prev{font-size:11px;color:var(--muted-foreground)}
 .tc-support-ic{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:9999px;background:var(--primary);color:#fff;flex:0 0 auto}
+.tc-x{transition:color .12s ease,background .12s ease,transform .12s ease}
+.tc-x:hover{color:var(--foreground)}
+.tc-x:active{transform:scale(.88)}
+.tc-danger:hover{color:var(--destructive,#dc2626)}
+.tc-tab{transition:background .12s ease,color .12s ease}
+.tc-send,.tc-newbtn,.tc-support-entry{transition:opacity .12s ease,transform .12s ease,background .12s ease}
+.tc-send:active,.tc-newbtn:active{transform:scale(.97)}
+.tc-pill{transition:border-color .12s ease,background .12s ease}
+@keyframes tcPop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes tcRise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tcFabIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
 @media(max-width:680px){.tc-panel{right:0;bottom:0;width:100vw;max-width:100vw;height:100dvh;border-radius:0;border:none}}
+@media(prefers-reduced-motion:reduce){.tc-panel,.tc-bubble,.tc-fab{animation:none}.tc-fab:hover svg{transform:none}}
 `;
 
 let injected = false;

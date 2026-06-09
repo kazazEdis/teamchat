@@ -17,6 +17,7 @@ export interface ChatApi {
   createChannel?: FunctionReference<"mutation">;
   joinChannel?: FunctionReference<"mutation">;
   leaveChannel?: FunctionReference<"mutation">;
+  removeConversation?: FunctionReference<"mutation">; // delete (admin/DM) or leave (member)
   // Phase 3 (optional):
   editMessage?: FunctionReference<"mutation">;
   deleteMessage?: FunctionReference<"mutation">;
@@ -51,6 +52,7 @@ export interface ConversationRow {
   lastMessageAt: number;
   unread: boolean;
   muted: boolean;
+  isAdmin?: boolean; // caller is a conversation admin → Delete (else Leave) for groups/channels
 }
 
 export interface MessageRow {

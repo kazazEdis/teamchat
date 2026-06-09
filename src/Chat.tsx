@@ -10,6 +10,7 @@ const IconChat = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="no
 const IconLife = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /><path d="m4.93 4.93 4.24 4.24m5.66 5.66 4.24 4.24M14.83 9.17l4.24-4.24M9.17 14.83l-4.24 4.24" /></svg>);
 const IconX = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>);
 const IconBack = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>);
+const IconTrash = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>);
 const IconClip = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>);
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "👀"];
 
@@ -236,6 +237,7 @@ function ChatThread({ conversationId }: { conversationId: string }) {
   const roster = useQuery(api.roster as any, {}) as RosterUser[] | undefined;
   const convos = useQuery(api.listMine as any, {}) as ConversationRow[] | undefined;
   const markRead = useMutation(api.markRead as any);
+  const removeConversation = useMutation((api.removeConversation ?? api.markRead) as any);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const nameById = useMemo(() => Object.fromEntries((roster ?? []).map((r) => [r.userId, r.name])), [roster]);
@@ -255,6 +257,14 @@ function ChatThread({ conversationId }: { conversationId: string }) {
     : convo?.kind === "channel" ? "Channel" : convo?.kind === "group" ? "Group" : "";
   const peerOnline = convo?.kind === "dm" && convo.peerId ? !!onlineById[convo.peerId] : undefined;
 
+  // Delete (DM, or admin of a group/channel) vs Leave (member). Backend (chat.removeConversation)
+  // enforces the same; the label is just UX.
+  const removeLabel = convo?.kind === "dm" ? "Delete chat" : convo?.isAdmin ? "Delete for everyone" : "Leave";
+  const onRemove = () => {
+    if (!window.confirm(`${removeLabel}? This can't be undone.`)) return;
+    removeConversation({ conversationId }).then(() => setActive(null)).catch(() => {});
+  };
+
   return (
     <div className="tc-thread">
       <div className="tc-thead">
@@ -266,7 +276,10 @@ function ChatThread({ conversationId }: { conversationId: string }) {
           <div className="tc-h" style={{ lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{title}</div>
           {subtitle && <div className="tc-thead-sub">{subtitle}</div>}
         </div>
-        <button className="tc-x" style={{ marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button>
+        {api.removeConversation && convo && (
+          <button className="tc-x tc-danger" style={{ marginLeft: "auto" }} title={removeLabel} onClick={onRemove}><IconTrash /></button>
+        )}
+        <button className="tc-x" style={api.removeConversation && convo ? undefined : { marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button>
       </div>
       <div className="tc-msgs" ref={scrollRef}>
         {msgs === undefined ? <div className="tc-empty">…</div>
