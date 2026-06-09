@@ -47,14 +47,81 @@ export function ChatPanel() {
 }
 
 function ChatSidebar() {
-  const [tab, setTab] = useState<"chats" | "people">("chats");
+  const [tab, setTab] = useState<"chats" | "channels" | "people">("chats");
   return (
     <div className="tc-sidebar">
       <div className="tc-tabs">
         <button className={`tc-tab${tab === "chats" ? " active" : ""}`} onClick={() => setTab("chats")}>Chats</button>
+        <button className={`tc-tab${tab === "channels" ? " active" : ""}`} onClick={() => setTab("channels")}>Channels</button>
         <button className={`tc-tab${tab === "people" ? " active" : ""}`} onClick={() => setTab("people")}>People</button>
       </div>
-      {tab === "chats" ? <ConversationList /> : <PeopleRoster />}
+      <NewConversationMenu />
+      {tab === "chats" ? <ConversationList /> : tab === "channels" ? <ChannelList /> : <PeopleRoster />}
+    </div>
+  );
+}
+
+// Create a new group or channel (compact inline forms).
+function NewConversationMenu() {
+  const { api, me, openConversation } = useChatCtx();
+  const [mode, setMode] = useState<null | "group" | "channel">(null);
+  const [title, setTitle] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
+  const roster = useQuery(api.roster as any, mode === "group" ? {} : "skip") as RosterUser[] | undefined;
+  const createGroup = useMutation((api.createGroup ?? api.getOrCreateDm) as any);
+  const createChannel = useMutation((api.createChannel ?? api.getOrCreateDm) as any);
+  const reset = () => { setMode(null); setTitle(""); setPicked([]); };
+  if (!api.createGroup && !api.createChannel) return null;
+  if (!mode) {
+    return (
+      <div style={{ display: "flex", gap: 6, margin: "8px 8px 0" }}>
+        {api.createGroup && <button className="tc-newbtn" style={{ margin: 0, flex: 1 }} onClick={() => setMode("group")}>+ Group</button>}
+        {api.createChannel && <button className="tc-newbtn" style={{ margin: 0, flex: 1 }} onClick={() => setMode("channel")}>+ Channel</button>}
+      </div>
+    );
+  }
+  const submit = async () => {
+    const name = title.trim();
+    if (!name) return;
+    if (mode === "group") { if (!picked.length) return; const id = await createGroup({ title: name, memberUserIds: picked }); reset(); openConversation(id as string); }
+    else { const id = await createChannel({ title: name }); reset(); openConversation(id as string); }
+  };
+  return (
+    <div style={{ margin: 8, padding: 8, border: "1px solid var(--border)", borderRadius: 8 }}>
+      <input className="tc-input" style={{ minHeight: 0, padding: "6px 8px", marginBottom: 6 }} placeholder={mode === "group" ? "Group name" : "Channel name"} value={title} onChange={(e) => setTitle(e.target.value)} />
+      {mode === "group" && (
+        <div style={{ maxHeight: 140, overflow: "auto", marginBottom: 6 }}>
+          {(roster ?? []).filter((u) => u.userId !== me.userId).map((u) => (
+            <label key={u.userId} style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13, padding: "2px 0", cursor: "pointer" }}>
+              <input type="checkbox" checked={picked.includes(u.userId)} onChange={() => setPicked((p) => p.includes(u.userId) ? p.filter((x) => x !== u.userId) : [...p, u.userId])} />
+              {u.name}
+            </label>
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 6 }}>
+        <button className="tc-send" style={{ flex: 1, height: 30 }} onClick={submit}>Create</button>
+        <button className="tc-iconbtn" style={{ width: "auto", padding: "0 10px", height: 30 }} onClick={reset}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function ChannelList() {
+  const { api, openConversation } = useChatCtx();
+  const channels = useQuery((api.listChannels ?? api.listMine) as any, {}) as { _id: string; title: string; description: string; joined: boolean }[] | undefined;
+  const join = useMutation((api.joinChannel ?? api.getOrCreateDm) as any);
+  if (!api.listChannels) return <div className="tc-empty">Channels are not enabled.</div>;
+  if (channels === undefined) return <div className="tc-empty">…</div>;
+  if (channels.length === 0) return <div className="tc-empty">No channels yet. Create one above.</div>;
+  return (
+    <div className="tc-list">
+      {channels.map((c) => (
+        <div key={c._id} className="tc-row" onClick={async () => { if (!c.joined) await join({ conversationId: c._id }); openConversation(c._id); }}>
+          <span style={{ fontWeight: 700, color: "var(--muted-foreground)", width: 30, textAlign: "center" }}>#</span>
+          <div className="tc-meta"><div className="tc-title">{c.title}</div><div className="tc-prev">{c.joined ? "Joined" : (c.description || "Tap to join")}</div></div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -103,6 +170,7 @@ function ChatThread({ conversationId }: { conversationId: string }) {
   const { api, me, setOpen } = useChatCtx();
   const msgs = useQuery(api.messages as any, { conversationId }) as MessageRow[] | undefined;
   const roster = useQuery(api.roster as any, {}) as RosterUser[] | undefined;
+  const convos = useQuery(api.listMine as any, {}) as ConversationRow[] | undefined;
   const sendMessage = useMutation(api.sendMessage as any);
   const markRead = useMutation(api.markRead as any);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -115,10 +183,7 @@ function ChatThread({ conversationId }: { conversationId: string }) {
   useEffect(() => { markRead({ conversationId }).catch(() => {}); }, [conversationId, msgs?.length]); // eslint-disable-line
   useEffect(() => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs?.length]);
 
-  const title = useMemo(() => {
-    // DM title from the roster peer if we can infer it; otherwise generic.
-    return "Conversation";
-  }, []);
+  const title = useMemo(() => convos?.find((c) => c._id === conversationId)?.title || "Conversation", [convos, conversationId]);
 
   return (
     <div className="tc-thread">
