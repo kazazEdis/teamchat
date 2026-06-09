@@ -23,6 +23,21 @@ export interface ChatApi {
   toggleReaction?: FunctionReference<"mutation">;
   uploadUrl?: FunctionReference<"mutation">;
   attachmentUrl?: FunctionReference<"query">;
+  // Support chat (optional — a pinned conversation with the platform's App Admins, bridged to the
+  // control plane host-side). When absent or `enabled` resolves false, the Support entry is hidden.
+  support?: {
+    enabled: FunctionReference<"query">;
+    thread: FunctionReference<"query">;
+    send: FunctionReference<"mutation">;
+  };
+}
+
+export interface SupportMessageRow {
+  _id: string;
+  senderKind: "user" | "admin";
+  senderName: string;
+  text: string;
+  createdAt: number;
 }
 
 export interface ChatMe { userId: string; name?: string }

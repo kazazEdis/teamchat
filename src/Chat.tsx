@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
-import { useChatCtx } from "./context";
+import { useChatCtx, SUPPORT_ID } from "./context";
 import { Avatar } from "./Avatar";
 import { MentionInput } from "./MentionInput";
 import { renderMentions } from "./mentions";
-import type { ConversationRow, MessageRow, RosterUser } from "./types";
+import type { ConversationRow, MessageRow, RosterUser, SupportMessageRow } from "./types";
 
 const IconChat = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>);
+const IconLife = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /><path d="m4.93 4.93 4.24 4.24m5.66 5.66 4.24 4.24M14.83 9.17l4.24-4.24M9.17 14.83l-4.24 4.24" /></svg>);
 const IconX = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>);
 const IconClip = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>);
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "👀"];
@@ -37,7 +38,7 @@ export function ChatPanel() {
       <div className="tc-overlay-bg" onClick={() => setOpen(false)} />
       <div className="tc-panel" onClick={(e) => e.stopPropagation()}>
         <ChatSidebar />
-        {active ? <ChatThread conversationId={active} /> : (
+        {active === SUPPORT_ID ? <SupportThread /> : active ? <ChatThread conversationId={active} /> : (
           <div className="tc-thread">
             <div className="tc-thead"><span className="tc-h">Chat</span><button className="tc-x" style={{ marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button></div>
             <div className="tc-empty">Select a conversation or a colleague to start.</div>
@@ -52,6 +53,7 @@ function ChatSidebar() {
   const [tab, setTab] = useState<"chats" | "channels" | "people">("chats");
   return (
     <div className="tc-sidebar">
+      <SupportEntry />
       <div className="tc-tabs">
         <button className={`tc-tab${tab === "chats" ? " active" : ""}`} onClick={() => setTab("chats")}>Chats</button>
         <button className={`tc-tab${tab === "channels" ? " active" : ""}`} onClick={() => setTab("channels")}>Channels</button>
@@ -164,6 +166,52 @@ function PeopleRoster() {
         </div>
       ))}
       {others.length === 0 && <div className="tc-empty">No colleagues yet.</div>}
+    </div>
+  );
+}
+
+// Pinned sidebar button that opens the Support thread. Hidden unless the host wired support refs AND
+// the bridge is enabled on this deployment (control plane reachable).
+function SupportEntry() {
+  const { api, active, setActive } = useChatCtx();
+  const enabled = useQuery((api.support?.enabled ?? api.unreadCount) as any, api.support ? {} : "skip") as boolean | undefined;
+  if (!api.support || !enabled) return null;
+  return (
+    <button className={`tc-support-entry${active === SUPPORT_ID ? " active" : ""}`} onClick={() => setActive(SUPPORT_ID)}>
+      <span className="tc-support-ic"><IconLife /></span>
+      <div className="tc-meta"><div className="tc-title">Support</div><div className="tc-prev">Message the app team</div></div>
+    </button>
+  );
+}
+
+function SupportThread() {
+  const { api, setOpen } = useChatCtx();
+  const msgs = useQuery((api.support?.thread ?? api.unreadCount) as any, api.support ? {} : "skip") as SupportMessageRow[] | undefined;
+  const send = useMutation((api.support?.send ?? api.sendMessage) as any);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [text, setText] = useState("");
+  useEffect(() => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight; }, [msgs?.length]);
+  const submit = () => { const t = text.trim(); if (!t) return; send({ text: t }).catch(() => {}); setText(""); };
+  return (
+    <div className="tc-thread">
+      <div className="tc-thead"><span className="tc-h">Support</span><button className="tc-x" style={{ marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button></div>
+      <div className="tc-msgs" ref={scrollRef}>
+        {msgs === undefined ? <div className="tc-empty">…</div>
+          : msgs.length === 0 ? <div className="tc-empty">Send a message to the app team — we'll reply here.</div>
+          : msgs.map((m) => (
+            <div key={m._id} className="tc-bubble">
+              <Avatar name={m.senderKind === "admin" ? "Support" : m.senderName} size={28} />
+              <div className="tc-b">
+                <div className="tc-bh"><span className="tc-bn">{m.senderKind === "admin" ? `Support · ${m.senderName}` : "You"}</span> · {fmtTime(m.createdAt)}</div>
+                <div className="tc-bt">{m.text}</div>
+              </div>
+            </div>
+          ))}
+      </div>
+      <div className="tc-composer">
+        <input className="tc-input" style={{ minHeight: 0, padding: "8px 10px" }} placeholder="Message Support…" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} />
+        <button className="tc-send" onClick={submit}>Send</button>
+      </div>
     </div>
   );
 }

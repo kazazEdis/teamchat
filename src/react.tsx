@@ -5,4 +5,4 @@ export { Avatar } from "./Avatar";
 export { MentionInput } from "./MentionInput";
 export { renderMentions } from "./mentions";
 export { usePresenceHeartbeat } from "./hooks";
-export type { ChatApi, ChatMe, ConversationRow, MessageRow, RosterUser } from "./types";
+export type { ChatApi, ChatMe, ConversationRow, MessageRow, RosterUser, SupportMessageRow } from "./types";

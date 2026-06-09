@@ -11,6 +11,9 @@ interface Ctx {
   setActive: (id: string | null) => void;
   openConversation: (id: string) => void;
 }
+// Sentinel `active` id for the pinned Support thread (it has no conversation row of its own).
+export const SUPPORT_ID = "__support__";
+
 const ChatCtx = createContext<Ctx | null>(null);
 
 export function useChatCtx(): Ctx {
@@ -27,7 +30,7 @@ export function ChatProvider({ api, me, children }: { api: ChatApi; me: ChatMe; 
   useEffect(() => { injectStyles(); }, []);
   const openConversation = useCallback((id: string) => { setActive(id); setOpen(true); }, []);
   useEffect(() => {
-    const h = (e: Event) => { const id = (e as CustomEvent)?.detail?.conversationId; setOpen(true); if (id) setActive(id); };
+    const h = (e: Event) => { const d = (e as CustomEvent)?.detail ?? {}; setOpen(true); if (d.support) setActive(SUPPORT_ID); else if (d.conversationId) setActive(d.conversationId); };
     window.addEventListener("teamchat:open", h);
     return () => window.removeEventListener("teamchat:open", h);
   }, []);

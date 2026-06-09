@@ -46,6 +46,13 @@ export const TEAMCHAT_CSS = `
 .tc-empty{padding:24px;text-align:center;color:var(--muted-foreground);font-size:13px}
 .tc-x{background:transparent;border:none;color:var(--muted-foreground);cursor:pointer;padding:2px}
 .tc-newbtn{margin:8px;padding:6px;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--primary);cursor:pointer;font-size:12px;font-weight:600}
+.tc-support-entry{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border:none;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--primary) 7%,transparent);color:var(--foreground);cursor:pointer}
+.tc-support-entry:hover{background:color-mix(in srgb,var(--primary) 12%,transparent)}
+.tc-support-entry.active{background:color-mix(in srgb,var(--primary) 16%,transparent)}
+.tc-support-entry .tc-meta{min-width:0;flex:1}
+.tc-support-entry .tc-title{font-size:13px;font-weight:700}
+.tc-support-entry .tc-prev{font-size:11px;color:var(--muted-foreground)}
+.tc-support-ic{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:9999px;background:var(--primary);color:#fff;flex:0 0 auto}
 @media(max-width:680px){.tc-panel{width:100vw}.tc-sidebar{width:200px;min-width:200px}}
 `;
 
