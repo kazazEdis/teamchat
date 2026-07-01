@@ -4,11 +4,12 @@ const PILL_CLASS = "tc-pill";
 
 // A contentEditable message composer: @-mentions render as inline non-editable pills as you type.
 // Enter sends; Shift+Enter inserts a newline. Serializes to "@Name" text + the mentioned userIds.
-export function MentionInput({ users, placeholder, onSubmit, allowEmpty }: {
+export function MentionInput({ users, placeholder, onSubmit, allowEmpty, onFiles }: {
   users: { userId: string; name: string }[];
   placeholder?: string;
   onSubmit: (text: string, mentionIds: string[]) => void;
   allowEmpty?: boolean;   // permit a send with no text (e.g. attachment-only)
+  onFiles?: (files: File[]) => void;   // pasted/dropped files (images from Ctrl+V) → host upload path
 }) {
   const edRef = useRef<HTMLDivElement | null>(null);
   const [mq, setMq] = useState<string | null>(null);
@@ -74,6 +75,22 @@ export function MentionInput({ users, placeholder, onSubmit, allowEmpty }: {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
+  // Ctrl/Cmd+V. Two cases: (1) clipboard carries files (e.g. a pasted image/screenshot) → hand them
+  // to the host upload path, never into the contentEditable. (2) plain text → insert as TEXT, stripping
+  // the rich HTML the browser would otherwise drop in (which breaks the plain-text/mention serializer).
+  const onPaste = (e: React.ClipboardEvent) => {
+    const dt = e.clipboardData;
+    if (!dt) return;
+    const files = Array.from(dt.files || []);
+    if (files.length && onFiles) { e.preventDefault(); onFiles(files); return; }
+    const text = dt.getData("text/plain");
+    if (text) {
+      e.preventDefault();
+      document.execCommand("insertText", false, text); // keeps caret/undo; newlines handled by serialize()
+      refresh();
+    }
+  };
+
   return (
     <div style={{ position: "relative", flex: 1 }}>
       <div
@@ -88,6 +105,7 @@ export function MentionInput({ users, placeholder, onSubmit, allowEmpty }: {
         onKeyUp={refresh}
         onClick={refresh}
         onKeyDown={onKeyDown}
+        onPaste={onPaste}
       />
       {suggestions.length > 0 && (
         <div className="tc-sug" style={{ bottom: "100%", marginBottom: 4 }}>

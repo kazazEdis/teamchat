@@ -298,7 +298,7 @@ function Composer({ conversationId, users }: { conversationId: string; users: { 
   const [pending, setPending] = useState<{ storageId: string; name: string; contentType?: string; size?: number }[]>([]);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const onFiles = async (files: FileList | null) => {
+  const onFiles = async (files: FileList | File[] | null) => {
     if (!files || !api.uploadUrl) return;
     setBusy(true);
     try {
@@ -329,7 +329,7 @@ function Composer({ conversationId, users }: { conversationId: string; users: { 
             <input ref={fileRef} type="file" multiple style={{ display: "none" }} onChange={(e) => { onFiles(e.target.files); e.target.value = ""; }} />
           </>
         )}
-        <MentionInput users={users} placeholder="Message…" allowEmpty={pending.length > 0} onSubmit={submit} />
+        <MentionInput users={users} placeholder="Message…" allowEmpty={pending.length > 0} onSubmit={submit} onFiles={api.uploadUrl ? onFiles : undefined} />
       </div>
     </div>
   );
