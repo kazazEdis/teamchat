@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { mentionQuery, serializeRoot } from "./mentionText";
 
 const PILL_CLASS = "tc-pill";
 
@@ -22,9 +23,9 @@ export function MentionInput({ users, placeholder, onSubmit, allowEmpty, onFiles
     if (!r.collapsed || r.startContainer.nodeType !== 3 || !edRef.current?.contains(r.startContainer)) return null;
     const node = r.startContainer as Text;
     const before = (node.textContent || "").slice(0, r.startOffset);
-    const m = before.match(/(?:^|[\s ])@([^@\s ]{0,30})$/);
-    if (!m) return null;
-    return { node, atIdx: r.startOffset - 1 - m[1].length, end: r.startOffset, query: m[1] };
+    const q = mentionQuery(before);
+    if (q === null) return null;
+    return { node, atIdx: r.startOffset - 1 - q.length, end: r.startOffset, query: q };
   };
   const refresh = () => { setEmpty(!edRef.current?.textContent?.trim()); const c = caretContext(); setMq(c ? c.query.toLowerCase() : null); };
   const suggestions = mq === null ? [] : users.filter((u) => u.name.toLowerCase().includes(mq)).slice(0, 6);
@@ -44,23 +45,8 @@ export function MentionInput({ users, placeholder, onSubmit, allowEmpty, onFiles
     edRef.current?.focus(); setMq(null); setEmpty(false);
   };
 
-  const serialize = (): { text: string; ids: string[] } => {
-    const el = edRef.current;
-    if (!el) return { text: "", ids: [] };
-    const walk = (n: Node): string => {
-      if (n.nodeType === 3) return n.textContent || "";
-      const e = n as HTMLElement;
-      if (e.dataset?.mentionName) return "@" + e.dataset.mentionName;
-      if (e.tagName === "BR") return "\n";
-      let s = ""; e.childNodes.forEach((c) => { s += walk(c); });
-      return e.tagName === "DIV" ? "\n" + s : s;
-    };
-    let text = ""; el.childNodes.forEach((n) => { text += walk(n); });
-    const ids = new Set<string>();
-    el.querySelectorAll<HTMLElement>("[data-mention-id]").forEach((s) => { if (s.dataset.mentionId) ids.add(s.dataset.mentionId); });
-    for (const u of users) if (u.name && text.includes(`@${u.name}`)) ids.add(u.userId);
-    return { text: text.trim(), ids: [...ids] };
-  };
+  const serialize = (): { text: string; ids: string[] } =>
+    edRef.current ? serializeRoot(edRef.current, users) : { text: "", ids: [] };
 
   const send = () => {
     const { text, ids } = serialize();

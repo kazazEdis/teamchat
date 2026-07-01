@@ -1,6 +1,6 @@
 {
   "name": "teamchat",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Teams-style in-app chat + presence UI (React). Backend-agnostic: the host app passes its Convex function references in. Ships TS source (no build) — consumers use transpilePackages.",
   "type": "module",
   "license": "MIT",
@@ -26,16 +26,19 @@
     "LICENSE"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "peerDependencies": {
-    "react": ">=18",
-    "convex": ">=1.17.0"
+    "convex": ">=1.17.0",
+    "react": ">=18"
   },
   "devDependencies": {
     "@types/react": "^18",
     "convex": "^1.17.0",
+    "jsdom": "^29.1.1",
     "react": "^18",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.9"
   }
 }
