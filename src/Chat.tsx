@@ -4,6 +4,7 @@ import { useChatCtx, SUPPORT_ID } from "./context";
 import { Avatar } from "./Avatar";
 import { MentionInput } from "./MentionInput";
 import { renderMentions } from "./mentions";
+import { serializeMessage, serializeSelection } from "./chatExport";
 import type { ConversationRow, MessageRow, RosterUser, SupportMessageRow } from "./types";
 
 const IconChat = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>);
@@ -240,6 +241,13 @@ function ChatThread({ conversationId }: { conversationId: string }) {
   const removeConversation = useMutation((api.removeConversation ?? api.markRead) as any);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
+  // Selective copy-to-clipboard: pick specific messages (a feedback item or a handful) and copy them out
+  // to paste elsewhere. Resets when switching conversations. No whole-thread copy (threads span years).
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [copiedBar, setCopiedBar] = useState(false);
+  useEffect(() => { setSelected(new Set()); setCopiedBar(false); }, [conversationId]);
+  const toggleSel = (id: string) => setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
   const nameById = useMemo(() => Object.fromEntries((roster ?? []).map((r) => [r.userId, r.name])), [roster]);
   const onlineById = useMemo(() => Object.fromEntries((roster ?? []).map((r) => [r.userId, r.online])), [roster]);
   const names = useMemo(() => (roster ?? []).map((r) => r.name), [roster]);
@@ -264,6 +272,13 @@ function ChatThread({ conversationId }: { conversationId: string }) {
     if (!window.confirm(`${removeLabel}? This can't be undone.`)) return;
     removeConversation({ conversationId }).then(() => setActive(null)).catch(() => {});
   };
+  const copySelected = () => {
+    const chosen = (msgs ?? []).filter((m) => selected.has(m._id) && !m.deleted);
+    if (!chosen.length || !navigator.clipboard) return;
+    navigator.clipboard.writeText(serializeSelection(chosen as any, nameById))
+      .then(() => { setCopiedBar(true); setTimeout(() => setCopiedBar(false), 1500); })
+      .catch(() => {});
+  };
 
   return (
     <div className="tc-thread">
@@ -281,10 +296,17 @@ function ChatThread({ conversationId }: { conversationId: string }) {
         )}
         <button className="tc-x" style={api.removeConversation && convo ? undefined : { marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button>
       </div>
+      {selected.size > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderBottom: "1px solid var(--border, #e5e5e5)", fontSize: 13 }}>
+          <span style={{ color: "var(--muted-foreground)" }}>{selected.size} selected</span>
+          <button className="tc-x" style={{ marginLeft: "auto" }} title="Copy selected to clipboard" onClick={copySelected}>{copiedBar ? "Copied ✓" : `Copy ${selected.size}`}</button>
+          <button className="tc-x" title="Clear selection" onClick={() => setSelected(new Set())}>Clear</button>
+        </div>
+      )}
       <div className="tc-msgs" ref={scrollRef}>
         {msgs === undefined ? <div className="tc-empty">…</div>
           : msgs.length === 0 ? <div className="tc-empty">No messages yet — say hi 👋</div>
-          : msgs.map((m) => <MessageBubble key={m._id} conversationId={conversationId} m={m} mine={m.senderId === me.userId} senderName={nameById[m.senderId] || "User"} names={names} />)}
+          : msgs.map((m) => <MessageBubble key={m._id} conversationId={conversationId} m={m} mine={m.senderId === me.userId} senderName={nameById[m.senderId] || "User"} names={names} selected={selected.has(m._id)} onToggleSelect={() => toggleSel(m._id)} />)}
       </div>
       <Composer conversationId={conversationId} users={users} />
     </div>
@@ -343,7 +365,7 @@ function AttachmentChip({ conversationId, a }: { conversationId: string; a: { st
   );
 }
 
-function MessageBubble({ conversationId, m, mine, senderName, names }: { conversationId: string; m: MessageRow; mine: boolean; senderName: string; names: string[] }) {
+function MessageBubble({ conversationId, m, mine, senderName, names, selected, onToggleSelect }: { conversationId: string; m: MessageRow; mine: boolean; senderName: string; names: string[]; selected: boolean; onToggleSelect: () => void }) {
   const { api, me } = useChatCtx();
   const toggleReaction = useMutation((api.toggleReaction ?? api.sendMessage) as any);
   const editMessage = useMutation((api.editMessage ?? api.sendMessage) as any);
@@ -351,6 +373,15 @@ function MessageBubble({ conversationId, m, mine, senderName, names }: { convers
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(m.text);
   const [picker, setPicker] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Copy THIS message out to the clipboard (single-message forward). Any message, not just yours.
+  const copyOne = () => {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText(serializeMessage(m as any, senderName))
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })
+      .catch(() => {});
+  };
 
   const react = (emoji: string) => { if (api.toggleReaction) toggleReaction({ messageId: m._id, emoji }).catch(() => {}); setPicker(false); };
   const saveEdit = () => { if (api.editMessage && draft.trim()) editMessage({ messageId: m._id, text: draft.trim() }).catch(() => {}); setEditing(false); };
@@ -362,7 +393,9 @@ function MessageBubble({ conversationId, m, mine, senderName, names }: { convers
         <div className="tc-bh">
           <span className="tc-bn">{mine ? "You" : senderName}</span> · {fmtTime(m.createdAt)}{m.editedAt ? " · (edited)" : ""}
           {!m.deleted && (
-            <span style={{ float: "right", display: "inline-flex", gap: 6 }}>
+            <span style={{ float: "right", display: "inline-flex", gap: 6, alignItems: "center" }}>
+              <input type="checkbox" title="Select to copy" checked={selected} onChange={onToggleSelect} style={{ cursor: "pointer", margin: 0 }} />
+              {typeof navigator !== "undefined" && navigator.clipboard && <button className="tc-x" title="Copy message" onClick={copyOne}>{copied ? "✓" : "⧉"}</button>}
               {api.toggleReaction && <button className="tc-x" title="React" onClick={() => setPicker((p) => !p)}>＋</button>}
               {mine && api.editMessage && <button className="tc-x" title="Edit" onClick={() => { setDraft(m.text); setEditing(true); }}>✎</button>}
               {mine && api.deleteMessage && <button className="tc-x" title="Delete" onClick={() => deleteMessage({ messageId: m._id }).catch(() => {})}>🗑</button>}
