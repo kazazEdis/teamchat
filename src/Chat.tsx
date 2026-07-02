@@ -11,6 +11,32 @@ const IconChat = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="no
 const IconLife = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="4" /><path d="m4.93 4.93 4.24 4.24m5.66 5.66 4.24 4.24M14.83 9.17l4.24-4.24M9.17 14.83l-4.24 4.24" /></svg>);
 const IconX = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>);
 const IconBack = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>);
+const IconCopy = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>);
+const IconCheck = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>);
+const IconPencil = () => (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>);
+const IconSmile = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" x2="9.01" y1="9" y2="9" /><line x1="15" x2="15.01" y1="9" y2="9" /></svg>);
+
+// Clipboard write that ALSO works in insecure contexts (http:// on a LAN / Tailscale host, where
+// navigator.clipboard is undefined) and older browsers — falls back to a hidden-textarea execCommand.
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard && typeof window !== "undefined" && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch { /* fall through to legacy path */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed"; ta.style.top = "-9999px"; ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch { return false; }
+}
 const IconTrash = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>);
 const IconClip = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>);
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "👀"];
@@ -272,12 +298,11 @@ function ChatThread({ conversationId }: { conversationId: string }) {
     if (!window.confirm(`${removeLabel}? This can't be undone.`)) return;
     removeConversation({ conversationId }).then(() => setActive(null)).catch(() => {});
   };
-  const copySelected = () => {
+  const copySelected = async () => {
     const chosen = (msgs ?? []).filter((m) => selected.has(m._id) && !m.deleted);
-    if (!chosen.length || !navigator.clipboard) return;
-    navigator.clipboard.writeText(serializeSelection(chosen as any, nameById))
-      .then(() => { setCopiedBar(true); setTimeout(() => setCopiedBar(false), 1500); })
-      .catch(() => {});
+    if (!chosen.length) return;
+    const ok = await copyText(serializeSelection(chosen as any, nameById));
+    if (ok) { setCopiedBar(true); setTimeout(() => { setCopiedBar(false); setSelected(new Set()); }, 900); }
   };
 
   return (
@@ -297,13 +322,15 @@ function ChatThread({ conversationId }: { conversationId: string }) {
         <button className="tc-x" style={api.removeConversation && convo ? undefined : { marginLeft: "auto" }} onClick={() => setOpen(false)}><IconX /></button>
       </div>
       {selected.size > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderBottom: "1px solid var(--border, #e5e5e5)", fontSize: 13 }}>
-          <span style={{ color: "var(--muted-foreground)" }}>{selected.size} selected</span>
-          <button className="tc-x" style={{ marginLeft: "auto" }} title="Copy selected to clipboard" onClick={copySelected}>{copiedBar ? "Copied ✓" : `Copy ${selected.size}`}</button>
-          <button className="tc-x" title="Clear selection" onClick={() => setSelected(new Set())}>Clear</button>
+        <div className="tc-selbar">
+          <span className="tc-selcount">{selected.size} selected</span>
+          <button className="tc-selcopy" title="Copy selected to clipboard" onClick={copySelected}>
+            {copiedBar ? <><IconCheck /> Copied</> : <><IconCopy /> Copy {selected.size}</>}
+          </button>
+          <button className="tc-selclear" title="Clear selection" onClick={() => setSelected(new Set())}>Clear</button>
         </div>
       )}
-      <div className="tc-msgs" ref={scrollRef}>
+      <div className={`tc-msgs${selected.size > 0 ? " tc-selecting" : ""}`} ref={scrollRef}>
         {msgs === undefined ? <div className="tc-empty">…</div>
           : msgs.length === 0 ? <div className="tc-empty">No messages yet — say hi 👋</div>
           : msgs.map((m) => <MessageBubble key={m._id} conversationId={conversationId} m={m} mine={m.senderId === me.userId} senderName={nameById[m.senderId] || "User"} names={names} selected={selected.has(m._id)} onToggleSelect={() => toggleSel(m._id)} />)}
@@ -376,31 +403,29 @@ function MessageBubble({ conversationId, m, mine, senderName, names, selected, o
   const [copied, setCopied] = useState(false);
 
   // Copy THIS message out to the clipboard (single-message forward). Any message, not just yours.
-  const copyOne = () => {
-    if (!navigator.clipboard) return;
-    navigator.clipboard.writeText(serializeMessage(m as any, senderName))
-      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })
-      .catch(() => {});
+  const copyOne = async () => {
+    const ok = await copyText(serializeMessage(m as any, senderName));
+    if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1400); }
   };
 
   const react = (emoji: string) => { if (api.toggleReaction) toggleReaction({ messageId: m._id, emoji }).catch(() => {}); setPicker(false); };
   const saveEdit = () => { if (api.editMessage && draft.trim()) editMessage({ messageId: m._id, text: draft.trim() }).catch(() => {}); setEditing(false); };
 
   return (
-    <div className="tc-bubble">
+    <div className={`tc-bubble${selected ? " tc-sel" : ""}`}>
+      <input type="checkbox" className="tc-selbox" title="Select to copy" checked={selected} onChange={onToggleSelect} />
       <Avatar name={senderName} size={28} />
+      {!m.deleted && (
+        <div className="tc-acts">
+          <button className={`tc-actbtn${copied ? " ok" : ""}`} title={copied ? "Copied" : "Copy message"} onClick={copyOne}>{copied ? <IconCheck /> : <IconCopy />}</button>
+          {api.toggleReaction && <button className="tc-actbtn" title="React" onClick={() => setPicker((p) => !p)}><IconSmile /></button>}
+          {mine && api.editMessage && <button className="tc-actbtn" title="Edit" onClick={() => { setDraft(m.text); setEditing(true); }}><IconPencil /></button>}
+          {mine && api.deleteMessage && <button className="tc-actbtn danger" title="Delete" onClick={() => deleteMessage({ messageId: m._id }).catch(() => {})}><IconTrash /></button>}
+        </div>
+      )}
       <div className="tc-b">
         <div className="tc-bh">
           <span className="tc-bn">{mine ? "You" : senderName}</span> · {fmtTime(m.createdAt)}{m.editedAt ? " · (edited)" : ""}
-          {!m.deleted && (
-            <span style={{ float: "right", display: "inline-flex", gap: 6, alignItems: "center" }}>
-              <input type="checkbox" title="Select to copy" checked={selected} onChange={onToggleSelect} style={{ cursor: "pointer", margin: 0 }} />
-              {typeof navigator !== "undefined" && navigator.clipboard && <button className="tc-x" title="Copy message" onClick={copyOne}>{copied ? "✓" : "⧉"}</button>}
-              {api.toggleReaction && <button className="tc-x" title="React" onClick={() => setPicker((p) => !p)}>＋</button>}
-              {mine && api.editMessage && <button className="tc-x" title="Edit" onClick={() => { setDraft(m.text); setEditing(true); }}>✎</button>}
-              {mine && api.deleteMessage && <button className="tc-x" title="Delete" onClick={() => deleteMessage({ messageId: m._id }).catch(() => {})}>🗑</button>}
-            </span>
-          )}
         </div>
         {picker && (
           <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>{EMOJIS.map((e) => <button key={e} className="tc-x" style={{ fontSize: 16 }} onClick={() => react(e)}>{e}</button>)}</div>

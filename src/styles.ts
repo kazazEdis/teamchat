@@ -67,6 +67,23 @@ export const TEAMCHAT_CSS = `
 .tc-send,.tc-newbtn,.tc-support-entry{transition:opacity .12s ease,transform .12s ease,background .12s ease}
 .tc-send:active,.tc-newbtn:active{transform:scale(.97)}
 .tc-pill{transition:border-color .12s ease,background .12s ease}
+/* message hover-actions + selection (copy to clipboard) */
+.tc-bubble{position:relative}
+.tc-selbox{align-self:center;flex:0 0 auto;width:15px;height:15px;accent-color:var(--primary);cursor:pointer;margin:0;opacity:0;transition:opacity .12s ease}
+.tc-bubble:hover .tc-selbox,.tc-msgs.tc-selecting .tc-selbox,.tc-selbox:checked{opacity:1}
+.tc-acts{position:absolute;top:-11px;right:6px;display:inline-flex;gap:1px;padding:2px;background:var(--popover,var(--card,var(--background)));border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.14);opacity:0;transform:translateY(3px);transition:opacity .12s ease,transform .12s ease;pointer-events:none;z-index:6}
+.tc-bubble:hover .tc-acts,.tc-acts:focus-within{opacity:1;transform:translateY(0);pointer-events:auto}
+.tc-actbtn{display:inline-grid;place-items:center;width:28px;height:28px;border:none;border-radius:6px;background:transparent;color:var(--muted-foreground);cursor:pointer;transition:background .12s ease,color .12s ease,transform .12s ease}
+.tc-actbtn:hover{background:color-mix(in srgb,var(--foreground) 8%,transparent);color:var(--foreground)}
+.tc-actbtn:active{transform:scale(.86)}
+.tc-actbtn.ok{color:var(--primary)}
+.tc-actbtn.danger:hover{color:var(--destructive,#dc2626)}
+.tc-selbar{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--primary) 7%,transparent);font-size:13px;animation:tcRise .18s ease both}
+.tc-selcount{color:var(--muted-foreground)}
+.tc-selcopy{margin-left:auto;height:30px;padding:0 14px;border:none;border-radius:7px;background:var(--primary);color:#fff;font-weight:600;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:opacity .12s ease,transform .12s ease}
+.tc-selcopy:active{transform:scale(.96)}
+.tc-selclear{background:transparent;border:none;color:var(--muted-foreground);font-size:12px;cursor:pointer;padding:4px 6px;border-radius:6px;transition:color .12s ease}
+.tc-selclear:hover{color:var(--foreground)}
 @keyframes tcPop{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes tcRise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes tcFabIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
