@@ -5,7 +5,7 @@ export interface ExportMsg {
   senderId: string;
   text: string;
   createdAt: number;
-  attachments?: { name: string }[];
+  attachments?: { storageId: string; name: string }[];
   deleted?: boolean;
 }
 
@@ -16,17 +16,22 @@ export function formatTs(ms: number): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-// One message → "**Sender** (ts): text" (+ an "[attachment: name]" line each). Deleted → a placeholder.
-// Uses the raw text, which already carries "@Name" mention text from send-time serialization.
-export function serializeMessage(m: ExportMsg, senderName: string): string {
+// One message → "**Sender** (ts): text" (+ one attachment line each). Deleted → a placeholder.
+// Attachments become a markdown LINK "[attachment: name](url)" when a resolved download URL is supplied
+// (via `urls[storageId]`) — so an image/file can be fetched + parsed by whatever it's pasted into. Falls
+// back to a bare "[attachment: name]" when the URL couldn't be resolved. Raw text carries "@Name" mentions.
+export function serializeMessage(m: ExportMsg, senderName: string, urls?: Record<string, string>): string {
   const head = `**${senderName}** (${formatTs(m.createdAt)}): `;
   if (m.deleted) return head + "[message deleted]";
-  const atts = (m.attachments ?? []).map((a) => `\n[attachment: ${a.name}]`).join("");
+  const atts = (m.attachments ?? []).map((a) => {
+    const u = urls?.[a.storageId];
+    return u ? `\n[attachment: ${a.name}](${u})` : `\n[attachment: ${a.name}]`;
+  }).join("");
   return head + (m.text || "") + atts;
 }
 
 // A selection (one message or a picked subset) → blank-line-separated blocks in the given order.
 // Sender names resolved from the roster map so forwarded text stays attributable (real names, not "You").
-export function serializeSelection(msgs: ExportMsg[], nameById: Record<string, string>): string {
-  return msgs.map((m) => serializeMessage(m, nameById[m.senderId] || "User")).join("\n\n");
+export function serializeSelection(msgs: ExportMsg[], nameById: Record<string, string>, urls?: Record<string, string>): string {
+  return msgs.map((m) => serializeMessage(m, nameById[m.senderId] || "User", urls)).join("\n\n");
 }

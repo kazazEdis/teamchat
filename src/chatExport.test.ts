@@ -16,9 +16,14 @@ describe("serializeMessage", () => {
     expect(serializeMessage({ senderId: "u1", text: "hi there", createdAt: t(14, 30) }, "Ana"))
       .toBe("**Ana** (2026-07-02 14:30): hi there");
   });
-  it("appends an [attachment: name] line per attachment", () => {
-    expect(serializeMessage({ senderId: "u1", text: "see this", createdAt: t(14, 30), attachments: [{ name: "a.png" }, { name: "b.pdf" }] }, "Ana"))
+  it("appends an [attachment: name] line per attachment (no URL resolved)", () => {
+    expect(serializeMessage({ senderId: "u1", text: "see this", createdAt: t(14, 30), attachments: [{ storageId: "s1", name: "a.png" }, { storageId: "s2", name: "b.pdf" }] }, "Ana"))
       .toBe("**Ana** (2026-07-02 14:30): see this\n[attachment: a.png]\n[attachment: b.pdf]");
+  });
+  it("renders attachments as markdown links when a URL is resolved", () => {
+    const urls = { s1: "https://x.convex.cloud/api/storage/abc" };
+    expect(serializeMessage({ senderId: "u1", text: "pic", createdAt: t(14, 30), attachments: [{ storageId: "s1", name: "a.png" }, { storageId: "s2", name: "b.pdf" }] }, "Ana", urls))
+      .toBe("**Ana** (2026-07-02 14:30): pic\n[attachment: a.png](https://x.convex.cloud/api/storage/abc)\n[attachment: b.pdf]");
   });
   it("shows a placeholder for a deleted message", () => {
     expect(serializeMessage({ senderId: "u1", text: "", createdAt: t(14, 30), deleted: true }, "Ana"))

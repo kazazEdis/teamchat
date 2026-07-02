@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useConvex } from "convex/react";
 import { useChatCtx, SUPPORT_ID } from "./context";
 import { Avatar } from "./Avatar";
 import { MentionInput } from "./MentionInput";
@@ -36,6 +36,18 @@ async function copyText(text: string): Promise<boolean> {
     document.body.removeChild(ta);
     return ok;
   } catch { return false; }
+}
+
+// Resolve a download URL for each attachment in the given messages (dedup by storageId) via the host's
+// attachmentUrl query, so copied images/files become fetchable links. Best-effort — misses are skipped.
+async function resolveAttachmentUrls(convex: any, attUrlRef: any, conversationId: string, msgs: { attachments?: { storageId: string }[] }[]): Promise<Record<string, string>> {
+  if (!attUrlRef || !convex) return {};
+  const ids = [...new Set(msgs.flatMap((m) => (m.attachments ?? []).map((a) => a.storageId)))];
+  const out: Record<string, string> = {};
+  await Promise.all(ids.map(async (storageId) => {
+    try { const u = await convex.query(attUrlRef, { conversationId, storageId }); if (u) out[storageId] = u; } catch { /* skip this one */ }
+  }));
+  return out;
 }
 const IconTrash = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>);
 const IconClip = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>);
@@ -265,6 +277,7 @@ function ChatThread({ conversationId }: { conversationId: string }) {
   const convos = useQuery(api.listMine as any, {}) as ConversationRow[] | undefined;
   const markRead = useMutation(api.markRead as any);
   const removeConversation = useMutation((api.removeConversation ?? api.markRead) as any);
+  const convex = useConvex();
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   // Selective copy-to-clipboard: pick specific messages (a feedback item or a handful) and copy them out
@@ -301,7 +314,8 @@ function ChatThread({ conversationId }: { conversationId: string }) {
   const copySelected = async () => {
     const chosen = (msgs ?? []).filter((m) => selected.has(m._id) && !m.deleted);
     if (!chosen.length) return;
-    const ok = await copyText(serializeSelection(chosen as any, nameById));
+    const urls = await resolveAttachmentUrls(convex, api.attachmentUrl, conversationId, chosen as any);
+    const ok = await copyText(serializeSelection(chosen as any, nameById, urls));
     if (ok) { setCopiedBar(true); setTimeout(() => { setCopiedBar(false); setSelected(new Set()); }, 900); }
   };
 
@@ -401,10 +415,13 @@ function MessageBubble({ conversationId, m, mine, senderName, names, selected, o
   const [draft, setDraft] = useState(m.text);
   const [picker, setPicker] = useState(false);
   const [copied, setCopied] = useState(false);
+  const convex = useConvex();
 
   // Copy THIS message out to the clipboard (single-message forward). Any message, not just yours.
+  // Resolves attachment download URLs so images/files paste as fetchable links.
   const copyOne = async () => {
-    const ok = await copyText(serializeMessage(m as any, senderName));
+    const urls = await resolveAttachmentUrls(convex, api.attachmentUrl, conversationId, [m as any]);
+    const ok = await copyText(serializeMessage(m as any, senderName, urls));
     if (ok) { setCopied(true); setTimeout(() => setCopied(false), 1400); }
   };
 
